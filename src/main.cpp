@@ -12,7 +12,10 @@
 #include <Adafruit_Sensor.h>
 
 // Bluetooth App
-#include <BlynkSimpleEsp32_BLE.h> 
+#include <BlynkSimpleEsp32_BLE.h>
+
+// custom
+#include <wifi_manager.h>
 
 // MAIN DECLARED FUNCTIONS
 void find_I2C_Address();
@@ -30,6 +33,7 @@ void log();
 uint8_t addresses[2];
 bool isSameAddress = true;
 bool DONE_SCANNING = false;
+bool IS_EMULATOR = true;
 
 // MQTT
 const char *SSID = "Visitantes";
@@ -37,11 +41,12 @@ const char *PASSWORD = "";
 WiFiClient espClient;
 PubSubClient MQTT(espClient);
 
+// WIFI
+WifiManager *wifi_manager;
+
 // Sensor
-const int MPU = 0x68;
 Adafruit_MPU6050 mpu;
-Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
-sensors_event_t a, g, temp;
+sensors_event_t accel, gyro, temperature;
 
 /* URL do broker MQTT que deseja utilizar */
 const char *BROKER_MQTT = "things.ubidots.com";
@@ -54,25 +59,15 @@ int BROKER_PORT = 1883;
 #define TOPICO_TEMPERATURA "temperatura"
 #define TOPICO_UBIDOTS "/v1.6/devices/esp32marco"
 
-// DATA STRUCTURES
-struct GyroAccelData
-{
-  char tipo = 'T';
-  float acelerometroX, acelerometroY, acelerometroZ;
-  float temperatura;
-  float giroscopioX, giroscopioY, giroscopioZ;
-};
-
-GyroAccelData gyroAccelData;
-
 void setup()
 {
   Serial.begin(115200);
   while (!Serial)
     ;
   Serial.println("Setting up -- ESP32");
-  init_MPU();
-  init_wifi();
+  if (!IS_EMULATOR)
+    init_MPU();
+  wifi_manager = new WifiManager("Pikachu", "dacasa275");
   init_mqtt();
 
   Wire.begin();
@@ -81,38 +76,31 @@ void setup()
 void loop()
 {
   find_I2C_Address();
+  wifi_manager->check_connection();
   verifica_conexoes_wifi_mqtt();
   get_accelerometer_and_gyroscope_data();
 
   char json[250];
   //Atribui para a cadeia de caracteres "json" os valores referentes a umidade e os envia para a variável do ubidots correspondente
   Serial.println("Temperatura");
-  Serial.println(temp.temperature);
-  sprintf(json, "{\"%s\":{\"value\":%02.02f, \"context\":{\"temperatura\":%02.02f, \"aceleracao\": %02.02f, \"velocidade\": %02.02f}}}", "temperatura", temp.temperature, temp.temperature, temp.temperature, temp.temperature);
+  Serial.println(temperature.temperature);
+  sprintf(json, "{\"%s\":{\"value\":%02.02f, \"context\":{\"temperatura\":%02.02f, \"aceleracao\": %02.02f, \"velocidade\": %02.02f}}}", "temperatura", temperature.temperature, temperature.temperature, temperature.temperature, temperature.temperature);
 
   if (!MQTT.publish(TOPICO_UBIDOTS, json))
     return;
 
   /* keep-alive da comunicação com broker MQTT */
   MQTT.loop();
-  /* Agurda 1 segundo para próximo envio */
   delay(1000);
 }
 
 void init_MPU()
 {
-  // Wire.begin();
-  // Wire.beginTransmission(MPU);
-  // Wire.write(0x6B);
-  // //Inicializa o MPU-6050
-  // Wire.write(0);
-  // Wire.endTransmission(true);
-
   if (!mpu.begin())
   {
     Serial.println("Sensor init failed");
-    while (1)
-      yield();
+    // while (1)
+    //   yield();
   }
   Serial.println("Found a MPU-6050 sensor");
 }
@@ -140,16 +128,6 @@ void reconnect_mqtt(void)
       delay(2000);
     }
   }
-}
-
-void init_wifi(void)
-{
-  delay(10);
-  Serial.println("------Conexao WI-FI------");
-  Serial.print("Conectando-se na rede: ");
-  Serial.println(SSID);
-  Serial.println("Aguarde");
-  reconnect_wifi();
 }
 
 /* Função: inicializa parâmetros de conexão MQTT(endereço do  
@@ -186,32 +164,6 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length)
   Serial.println(msg);
 }
 
-/* Função: reconecta-se ao WiFi
- * Parâmetros: nenhum
- * Retorno: nenhum
-*/
-void reconnect_wifi()
-{
-  /* se já está conectado a rede WI-FI, nada é feito. 
-       Caso contrário, são efetuadas tentativas de conexão */
-  if (WiFi.status() == WL_CONNECTED)
-    return;
-
-  WiFi.begin(SSID, PASSWORD);
-
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(100);
-    Serial.print(".");
-  }
-
-  Serial.println();
-  Serial.print("Conectado com sucesso na rede ");
-  Serial.print(SSID);
-  Serial.println("IP obtido: ");
-  Serial.println(WiFi.localIP());
-}
-
 /* Função: verifica o estado das conexões WiFI e ao broker MQTT. 
  *         Em caso de desconexão (qualquer uma das duas), a conexão
  *         é refeita.
@@ -220,8 +172,6 @@ void reconnect_wifi()
  */
 void verifica_conexoes_wifi_mqtt(void)
 {
-  /* se não há conexão com o WiFI, a conexão é refeita */
-  reconnect_wifi();
   /* se não há conexão com o Broker, a conexão é refeita */
   if (!MQTT.connected())
     reconnect_mqtt();
@@ -229,25 +179,7 @@ void verifica_conexoes_wifi_mqtt(void)
 
 void get_accelerometer_and_gyroscope_data()
 {
-  // Wire.beginTransmission(MPU);
-  // Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H)
-  // Wire.endTransmission(false);
-  // //Solicita os dados do sensor
-  // Wire.requestFrom(MPU, 14, true);
-  // //Armazena o valor dos sensores nas variaveis correspondentes
-  // gyroAccelData.acelerometroX = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80); //0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
-  // gyroAccelData.acelerometroY = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80); //0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  // gyroAccelData.acelerometroZ = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80); //0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-  // gyroAccelData.temperatura = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-  // gyroAccelData.giroscopioX = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-  // gyroAccelData.giroscopioY = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-  // gyroAccelData.giroscopioZ = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-  // if (gyroAccelData.temperatura == 0)
-  // {
-  //   gyroAccelData.temperatura = gyroAccelData.temperatura / (340.00 + 36.53);
-  // }
-
-  mpu.getEvent(&a, &g, &temp);
+  mpu.getEvent(&accel, &gyro, &temperature);
   log();
 }
 
@@ -317,25 +249,11 @@ void find_I2C_Address()
     Serial.println(foundThisRound);
     DONE_SCANNING = true;
   }
-  delay(1000); // wait 5 seconds for next scan
+  delay(1000); // wait 1 seconds for next scan
 }
 
 void log()
 {
-  Serial.println("Slave sending");
-  Serial.println("struct GyroAccelData");
-  Serial.print("AX:");
-  Serial.println(gyroAccelData.acelerometroX);
-  Serial.print("AY:");
-  Serial.println(gyroAccelData.acelerometroY);
-  Serial.print("AZ:");
-  Serial.println(gyroAccelData.acelerometroZ);
-  Serial.print("GX:");
-  Serial.println(gyroAccelData.giroscopioX);
-  Serial.print("GY:");
-  Serial.println(gyroAccelData.giroscopioY);
-  Serial.print("GZ:");
-  Serial.println(gyroAccelData.giroscopioZ);
-  Serial.print("T:");
-  Serial.println(gyroAccelData.temperatura);
+  Serial.print("EMULADOR: ");
+  Serial.println(IS_EMULATOR);
 }
