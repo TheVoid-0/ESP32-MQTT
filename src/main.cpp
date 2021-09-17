@@ -1,8 +1,19 @@
 #include <Arduino.h>
 
+// MQTT
 #include <WiFi.h>
 #include <PubSubClient.h>
+
+// MPU sensor
 #include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_Sensor.h>
+
+// Bluetooth App
+#include <BlynkSimpleEsp32_BLE.h> 
+
 // MAIN DECLARED FUNCTIONS
 void find_I2C_Address();
 void init_MPU();
@@ -16,15 +27,21 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length);
 void log();
 
 // MAIN DECLARED VARIABLES
-//Endereco I2C do MPU6050 (giroscopio e acelerometro)
-const int MPU = 0x68;
 uint8_t addresses[2];
 bool isSameAddress = true;
 bool DONE_SCANNING = false;
+
+// MQTT
 const char *SSID = "Visitantes";
 const char *PASSWORD = "";
 WiFiClient espClient;
 PubSubClient MQTT(espClient);
+
+// Sensor
+const int MPU = 0x68;
+Adafruit_MPU6050 mpu;
+Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
+sensors_event_t a, g, temp;
 
 /* URL do broker MQTT que deseja utilizar */
 const char *BROKER_MQTT = "things.ubidots.com";
@@ -70,8 +87,8 @@ void loop()
   char json[250];
   //Atribui para a cadeia de caracteres "json" os valores referentes a umidade e os envia para a variável do ubidots correspondente
   Serial.println("Temperatura");
-  Serial.println(gyroAccelData.temperatura);
-  sprintf(json, "{\"%s\":{\"value\":%02.02f, \"context\":{\"temperatura\":%02.02f, \"aceleracao\": %02.02f, \"velocidade\": %02.02f}}}", "temperatura", gyroAccelData.temperatura, gyroAccelData.temperatura, gyroAccelData.temperatura, gyroAccelData.temperatura);
+  Serial.println(temp.temperature);
+  sprintf(json, "{\"%s\":{\"value\":%02.02f, \"context\":{\"temperatura\":%02.02f, \"aceleracao\": %02.02f, \"velocidade\": %02.02f}}}", "temperatura", temp.temperature, temp.temperature, temp.temperature, temp.temperature);
 
   if (!MQTT.publish(TOPICO_UBIDOTS, json))
     return;
@@ -84,12 +101,20 @@ void loop()
 
 void init_MPU()
 {
-  Wire.begin();
-  Wire.beginTransmission(MPU);
-  Wire.write(0x6B);
-  //Inicializa o MPU-6050
-  Wire.write(0);
-  Wire.endTransmission(true);
+  // Wire.begin();
+  // Wire.beginTransmission(MPU);
+  // Wire.write(0x6B);
+  // //Inicializa o MPU-6050
+  // Wire.write(0);
+  // Wire.endTransmission(true);
+
+  if (!mpu.begin())
+  {
+    Serial.println("Sensor init failed");
+    while (1)
+      yield();
+  }
+  Serial.println("Found a MPU-6050 sensor");
 }
 
 /* Função: reconecta-se ao broker MQTT (caso ainda não esteja conectado ou em caso de a conexão cair)
@@ -204,21 +229,26 @@ void verifica_conexoes_wifi_mqtt(void)
 
 void get_accelerometer_and_gyroscope_data()
 {
-  Wire.beginTransmission(MPU);
-  Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H)
-  Wire.endTransmission(false);
-  //Solicita os dados do sensor
-  Wire.requestFrom(MPU, 14, true);
-  //Armazena o valor dos sensores nas variaveis correspondentes
-  gyroAccelData.acelerometroX = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80); //0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
-  gyroAccelData.acelerometroY = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80); //0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  gyroAccelData.acelerometroZ = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80); //0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-  gyroAccelData.temperatura = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-  gyroAccelData.giroscopioX = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-  gyroAccelData.giroscopioY = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-  gyroAccelData.giroscopioZ = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+  // Wire.beginTransmission(MPU);
+  // Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H)
+  // Wire.endTransmission(false);
+  // //Solicita os dados do sensor
+  // Wire.requestFrom(MPU, 14, true);
+  // //Armazena o valor dos sensores nas variaveis correspondentes
+  // gyroAccelData.acelerometroX = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80); //0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
+  // gyroAccelData.acelerometroY = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80); //0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+  // gyroAccelData.acelerometroZ = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80); //0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+  // gyroAccelData.temperatura = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+  // gyroAccelData.giroscopioX = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+  // gyroAccelData.giroscopioY = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+  // gyroAccelData.giroscopioZ = (Wire.read() << 8 | Wire.read()) / (16384 * 9.80);   //0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+  // if (gyroAccelData.temperatura == 0)
+  // {
+  //   gyroAccelData.temperatura = gyroAccelData.temperatura / (340.00 + 36.53);
+  // }
+
+  mpu.getEvent(&a, &g, &temp);
   log();
-  gyroAccelData.temperatura = gyroAccelData.temperatura / 340.00 + 36.53;
 }
 
 void find_I2C_Address()
