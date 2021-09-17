@@ -1,4 +1,4 @@
-#include "wifi_manager.h"
+#include "WifiManager.h"
 
 WifiManager::WifiManager()
 {
