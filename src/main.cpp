@@ -85,28 +85,8 @@ void loop()
   }
 
   wifi_manager->check_connection();
-  get_accelerometer_and_gyroscope_data();
 
-  char json[250];
-  //Atribui para a cadeia de caracteres "json" os valores referentes a umidade e os envia para a variável do ubidots correspondente
-  Serial.println("Temperatura");
-  Serial.println(temperature.temperature);
-  sprintf(json, "{\"%s\":{\"value\":%02.02f, \"context\":{\"temperatura\":%02.02f, \"aceleracao\": %02.02f, \"velocidade\": %02.02f}}}", "temperatura", temperature.temperature, temperature.temperature, temperature.temperature, temperature.temperature);
-
-  if (!mqtt->publish(TOPICO_UBIDOTS, json))
-  {
-    Serial.println("Error on sending");
-  }
-  else
-  {
-    Serial.println("Success");
-  }
-  char json2[250];
-  sprintf(json2, "{\"%s\":{\"value\":%02.02f, \"context\":{\"aceleracao\":%02.02f, \"aceleracao\": %02.02f, \"velocidade\": %02.02f}}}", "temperatura", accel.acceleration.x, temperature.temperature, temperature.temperature, temperature.temperature);
-  mqtt->publish(TOPICO_UBIDOTS, json2);
-  char json3[250];
-  sprintf(json3, "{\"%s\":{\"value\":%02.02f, \"context\":{\"velocidade\":%02.02f, \"aceleracao\": %02.02f, \"velocidade\": %02.02f}}}", "temperatura", gyro.gyro.x, temperature.temperature, temperature.temperature, temperature.temperature);
-  mqtt->publish(TOPICO_UBIDOTS, json3);
+  sensor_service->publishData();
 
   /* keep-alive da comunicação com broker MQTT */
   mqtt->check_connection();

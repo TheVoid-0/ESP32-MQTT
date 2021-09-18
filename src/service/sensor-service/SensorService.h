@@ -18,10 +18,10 @@ private:
     Adafruit_MPU6050 mpu;
     sensors_event_t accel, gyro, temperature;
     bool is_emulator;
+    void get_accelerometer_and_gyroscope_data();
 
 public:
     SensorService(MqttManager *mqttManager, bool is_emulator);
-    void get_accelerometer_and_gyroscope_data();
     void publishData();
 };
 
