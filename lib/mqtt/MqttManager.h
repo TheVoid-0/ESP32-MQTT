@@ -14,6 +14,7 @@ private:
     std::string mqtt_id;
     std::string mqtt_token;
     std::vector<std::string> subscribe_topics;
+    bool mqttEnabled = true;
 
     void initializeClients();
     void subscribe_to_topics();
@@ -32,4 +33,5 @@ public:
     void remove_subscritpion_topic_all();
     void publish_to_all(std::string payload);
     boolean publish(std::string topic, std::string payload);
+    void setMqttEnabled(bool mqttEnabled);
 };

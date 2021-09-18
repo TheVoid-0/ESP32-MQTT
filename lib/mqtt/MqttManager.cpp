@@ -118,6 +118,10 @@ void MqttManager::remove_subscritpion_topic_all()
 
 void MqttManager::publish_to_all(std::string payload)
 {
+    if (!this->mqttEnabled)
+    {
+        return;
+    }
     for (auto topic : this->subscribe_topics)
     {
         this->mqtt->publish(topic.c_str(), payload.c_str());
@@ -126,5 +130,17 @@ void MqttManager::publish_to_all(std::string payload)
 
 boolean MqttManager::publish(std::string topic, std::string payload)
 {
-    return this->mqtt->publish(topic.c_str(), payload.c_str());
+    if (this->mqttEnabled)
+    {
+        Serial.println("Envio habilitado");
+
+        return this->mqtt->publish(topic.c_str(), payload.c_str());
+    }
+    Serial.println("Envio desabilitado");
+    return false;
+}
+
+void MqttManager::setMqttEnabled(bool mqttEnabled)
+{
+    this->mqttEnabled = mqttEnabled;
 }

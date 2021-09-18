@@ -1,4 +1,4 @@
 #pragma once
 
-#define WIFI_SSID "Pikachu"
-#define WIFI_PASSWORD "dacasa275"
+#define WIFI_SSID "Visitantes"
+#define WIFI_PASSWORD ""
