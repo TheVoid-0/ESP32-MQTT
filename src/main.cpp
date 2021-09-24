@@ -62,6 +62,20 @@ SensorService *sensor_service;
 
 I2CManager i2c_manager;
 
+template <typename T>
+struct TaskConfig
+{
+  void (*task_function)(void);
+  T function_context;
+};
+
+template <typename T>
+void runTask(void *params)
+{
+  TaskConfig<T> *taskConfig = (TaskConfig<T> *)params;
+  taskConfig->function_context->task_function();
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -108,7 +122,7 @@ void loop()
 {
   Serial.print("Loop no core:"); // API do arduino maldita roda esse loop independentemente de ser util ou não
   Serial.println(xPortGetCoreID());
-  vTaskDelete(NULL);  // Adeus loop do arduino :)
+  vTaskDelete(NULL); // Adeus loop do arduino :)
 }
 
 void core1_task(void *parameters)
